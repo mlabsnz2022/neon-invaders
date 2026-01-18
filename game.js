@@ -495,7 +495,7 @@ class Bomb {
 
 // Enemy class
 class Enemy {
-    constructor(x, y, color, health) {
+    constructor(x, y, color, health, type = 0) {
         this.x = x;
         this.y = y;
         this.width = 40;
@@ -506,6 +506,112 @@ class Enemy {
         this.flashTimer = 0;
         this.scale = 1.0;
         this.brightness = 1.0; // Increases with each hit
+        this.type = type; // 0=squid, 1=crab, 2=octopus, 3=jellyfish
+        this.animFrame = 0; // Animation frame (0 or 1)
+    }
+
+    drawSquid(centerX, centerY, drawColor) {
+        // Top row - squid shape with tentacles
+        const frame = this.animFrame;
+        ctx.beginPath();
+        // Head
+        ctx.moveTo(this.x + 10, this.y + 5);
+        ctx.lineTo(this.x + 30, this.y + 5);
+        ctx.lineTo(this.x + 35, this.y + 15);
+        ctx.lineTo(this.x + 5, this.y + 15);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fillStyle = drawColor + '22';
+        ctx.fill();
+
+        // Tentacles (animated)
+        const tentacleOffset = frame ? 2 : -2;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 8, this.y + 15);
+        ctx.lineTo(this.x + 5 + tentacleOffset, this.y + 25);
+        ctx.moveTo(this.x + 16, this.y + 15);
+        ctx.lineTo(this.x + 15 + tentacleOffset, this.y + 28);
+        ctx.moveTo(this.x + 24, this.y + 15);
+        ctx.lineTo(this.x + 25 - tentacleOffset, this.y + 28);
+        ctx.moveTo(this.x + 32, this.y + 15);
+        ctx.lineTo(this.x + 35 - tentacleOffset, this.y + 25);
+        ctx.stroke();
+    }
+
+    drawCrab(centerX, centerY, drawColor) {
+        // Second row - crab shape with claws
+        const frame = this.animFrame;
+        ctx.beginPath();
+        // Body
+        ctx.moveTo(this.x + 8, this.y + 10);
+        ctx.lineTo(this.x + 32, this.y + 10);
+        ctx.lineTo(this.x + 35, this.y + 20);
+        ctx.lineTo(this.x + 5, this.y + 20);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fillStyle = drawColor + '22';
+        ctx.fill();
+
+        // Claws (animated)
+        const clawSpread = frame ? 8 : 4;
+        ctx.beginPath();
+        // Left claw
+        ctx.moveTo(this.x + 5, this.y + 15);
+        ctx.lineTo(this.x - clawSpread, this.y + 8);
+        ctx.lineTo(this.x - clawSpread, this.y + 5);
+        // Right claw
+        ctx.moveTo(this.x + 35, this.y + 15);
+        ctx.lineTo(this.x + 40 + clawSpread, this.y + 8);
+        ctx.lineTo(this.x + 40 + clawSpread, this.y + 5);
+        ctx.stroke();
+    }
+
+    drawOctopus(centerX, centerY, drawColor) {
+        // Third row - octopus shape
+        const frame = this.animFrame;
+        ctx.beginPath();
+        // Round head
+        ctx.arc(centerX, this.y + 12, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = drawColor + '22';
+        ctx.fill();
+
+        // Arms (animated wave)
+        const waveOffset = frame ? 3 : -3;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            const armX = this.x + 10 + i * 7;
+            ctx.moveTo(armX, this.y + 20);
+            ctx.lineTo(armX + waveOffset, this.y + 28);
+        }
+        ctx.stroke();
+    }
+
+    drawJellyfish(centerX, centerY, drawColor) {
+        // Fourth row - jellyfish shape
+        const frame = this.animFrame;
+        const pulseSize = frame ? 2 : 0;
+
+        ctx.beginPath();
+        // Bell (pulsing)
+        ctx.moveTo(this.x + 20, this.y + 5 - pulseSize);
+        ctx.quadraticCurveTo(this.x + 35, this.y + 10, this.x + 30, this.y + 18);
+        ctx.lineTo(this.x + 10, this.y + 18);
+        ctx.quadraticCurveTo(this.x + 5, this.y + 10, this.x + 20, this.y + 5 - pulseSize);
+        ctx.stroke();
+        ctx.fillStyle = drawColor + '22';
+        ctx.fill();
+
+        // Trailing tentacles (animated)
+        const trailOffset = frame ? 4 : 0;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 12, this.y + 18);
+        ctx.lineTo(this.x + 10, this.y + 26 + trailOffset);
+        ctx.moveTo(this.x + 20, this.y + 18);
+        ctx.lineTo(this.x + 20, this.y + 28 + trailOffset);
+        ctx.moveTo(this.x + 28, this.y + 18);
+        ctx.lineTo(this.x + 30, this.y + 26 + trailOffset);
+        ctx.stroke();
     }
 
     draw() {
@@ -529,20 +635,21 @@ class Enemy {
         ctx.strokeStyle = drawColor;
         ctx.lineWidth = 2;
 
-        ctx.beginPath();
-        ctx.moveTo(this.x + 5, this.y);
-        ctx.lineTo(this.x + 15, this.y + 10);
-        ctx.lineTo(this.x + 25, this.y + 10);
-        ctx.lineTo(this.x + 35, this.y);
-        ctx.lineTo(this.x + 40, this.y + 20);
-        ctx.lineTo(this.x + 30, this.y + 30);
-        ctx.lineTo(this.x + 10, this.y + 30);
-        ctx.lineTo(this.x, this.y + 20);
-        ctx.closePath();
-
-        ctx.stroke();
-        ctx.fillStyle = drawColor + '22';
-        ctx.fill();
+        // Draw based on enemy type
+        switch (this.type) {
+            case 0:
+                this.drawSquid(centerX, centerY, drawColor);
+                break;
+            case 1:
+                this.drawCrab(centerX, centerY, drawColor);
+                break;
+            case 2:
+                this.drawOctopus(centerX, centerY, drawColor);
+                break;
+            case 3:
+                this.drawJellyfish(centerX, centerY, drawColor);
+                break;
+        }
 
         // Draw health number in center
         if (this.health > 0) {
@@ -581,6 +688,8 @@ class Saucer {
         this.x = direction === 1 ? -this.width : CANVAS_WIDTH;
         this.y = 50; // Positioned above the main enemy grid
         this.active = true;
+        this.spinFrame = 0; // 0-7 for 8-frame spin cycle
+        this.spinTimer = 0;
     }
 
     draw() {
@@ -591,18 +700,40 @@ class Saucer {
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 2;
 
-        // Saucer body (ellipse)
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+
+        // Calculate width scale based on spin frame (creates perspective)
+        // Frame 0,4 = edge-on (narrow), Frame 2,6 = face-on (wide)
+        const spinPhase = this.spinFrame / 8 * Math.PI * 2;
+        const widthScale = Math.abs(Math.cos(spinPhase)) * 0.7 + 0.3; // Range: 0.3 to 1.0
+        const currentWidth = this.width * widthScale;
+
+        // Saucer body (ellipse with perspective)
         ctx.beginPath();
-        ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX, centerY, currentWidth / 2, this.height / 2, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Cockpit dome
-        ctx.beginPath();
-        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 4, Math.PI, 0);
-        ctx.stroke();
+        // Cockpit dome (only visible when not edge-on)
+        if (widthScale > 0.5) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, currentWidth / 4, Math.PI, 0);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            ctx.fill();
+        }
 
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
-        ctx.fill();
+        // Add detail lines for spinning effect
+        if (widthScale > 0.6) {
+            ctx.beginPath();
+            // Horizontal detail lines
+            ctx.moveTo(centerX - currentWidth / 3, centerY - 3);
+            ctx.lineTo(centerX + currentWidth / 3, centerY - 3);
+            ctx.moveTo(centerX - currentWidth / 3, centerY + 3);
+            ctx.lineTo(centerX + currentWidth / 3, centerY + 3);
+            ctx.stroke();
+        }
+
         ctx.restore();
     }
 
@@ -613,6 +744,13 @@ class Saucer {
         if ((this.direction === 1 && this.x > CANVAS_WIDTH) ||
             (this.direction === -1 && this.x < -this.width)) {
             this.active = false;
+        }
+
+        // Update spin animation (faster spin = more dramatic)
+        this.spinTimer++;
+        if (this.spinTimer >= 4) { // Spin every 4 frames
+            this.spinTimer = 0;
+            this.spinFrame = (this.spinFrame + 1) % 8;
         }
     }
 }
@@ -766,6 +904,7 @@ let enemyDirection = 1;
 let enemyMoveTimer = 0;
 let enemyMoveSpeed = 1;
 let levelBaseSpeed = 1;
+let enemyAnimTimer = 0; // Animation timer for marching effect
 
 let player = new Player();
 let bullets = [];
@@ -812,7 +951,8 @@ function spawnEnemies() {
                 offsetX + c * spacing,
                 offsetY + r * spacing,
                 rowConfig[r].color,
-                rowConfig[r].health
+                rowConfig[r].health,
+                r // Pass row index as enemy type
             ));
         }
     }
@@ -1134,6 +1274,15 @@ function updateEnemies() {
             const b = new Bomb(e.x + e.width / 2, e.y + e.height, e.color);
             b.currentSpeed = currentBombSpeed;
             bombs.push(b);
+        }
+    }
+
+    // Toggle animation frame every 30 frames for marching effect
+    enemyAnimTimer++;
+    if (enemyAnimTimer >= 30) {
+        enemyAnimTimer = 0;
+        for (let e of enemies) {
+            e.animFrame = e.animFrame ? 0 : 1;
         }
     }
 }
