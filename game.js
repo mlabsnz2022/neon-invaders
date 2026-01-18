@@ -255,6 +255,59 @@ const AudioEngine = {
     }
 };
 
+const MUSIC_TRACKS = [
+    'music/Static_In_The Summer_Mall.mp3',
+    'music/Static_In_The Summer_Mall2.mp3',
+    'music/Vertigo_of_the_Neon_Unknown_1.mp3',
+    'music/Vertigo_of_the_Neon_Unknown_2.mp3'
+];
+
+const MusicEngine = {
+    currentAudio: null,
+    currentIndex: -1,
+    introIndex: -1,
+
+    playRandomTrack(excludeIndex = -1) {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio = null;
+        }
+
+        let nextIndex;
+        do {
+            nextIndex = Math.floor(Math.random() * MUSIC_TRACKS.length);
+        } while (nextIndex === excludeIndex || (MUSIC_TRACKS.length > 1 && nextIndex === this.currentIndex));
+
+        this.currentIndex = nextIndex;
+        this.currentAudio = new Audio(MUSIC_TRACKS[this.currentIndex]);
+        this.currentAudio.volume = 0.4;
+
+        // When track ends, play another random one (excluding the one that just finished)
+        this.currentAudio.addEventListener('ended', () => {
+            this.playRandomTrack(this.currentIndex);
+        });
+
+        this.currentAudio.play().catch(e => console.log("Audio play failed (autoplay policy?):", e));
+    },
+
+    playIntro() {
+        this.playRandomTrack();
+        this.introIndex = this.currentIndex;
+    },
+
+    playGame() {
+        // Start game music, ensuring we don't pick the intro track
+        this.playRandomTrack(this.introIndex);
+    },
+
+    stop() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio = null;
+        }
+    }
+};
+
 // Input handling
 const keys = {
     ArrowLeft: false,
@@ -639,6 +692,7 @@ function showIntro() {
         saucer = null;
     }
     AudioEngine.stopSaucerSiren();
+    MusicEngine.playIntro();
 }
 
 function resetGame() {
@@ -666,6 +720,7 @@ function resetGame() {
     if (AudioEngine.ctx && AudioEngine.ctx.state === 'suspended') {
         AudioEngine.ctx.resume();
     }
+    MusicEngine.playGame();
 
     scoreElement.textContent = "0000";
     livesElement.textContent = "3";
@@ -689,6 +744,7 @@ function triggerGameOver() {
         saucer = null;
     }
     AudioEngine.playGameOver();
+    MusicEngine.stop();
     finalScoreElement.textContent = score.toString().padStart(4, '0');
     gameOverOverlay.classList.remove('hidden');
     gameOverOverlay.classList.add('visible');
