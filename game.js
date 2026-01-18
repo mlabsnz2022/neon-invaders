@@ -326,6 +326,9 @@ window.addEventListener('keydown', (e) => {
             player.canManualFire = false;
         }
     }
+    if (e.code === 'Space' && !e.repeat && isInMenu) {
+        resetGame();
+    }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -371,6 +374,66 @@ class Particle {
         this.life -= this.decay;
         this.speedX *= 0.98;
         this.speedY *= 0.98;
+    }
+}
+
+// Star class for background
+class Star {
+    constructor() {
+        this.reset(true);
+    }
+
+    reset(randomY = false) {
+        this.x = Math.random() * CANVAS_WIDTH;
+        this.y = randomY ? Math.random() * CANVAS_HEIGHT : -10;
+        this.size = Math.random() * 2 + 0.5;
+        this.speed = Math.random() * 0.5 + 0.1; // Slow scrolling
+
+        // Dimmer array of neon colors
+        const colors = [
+            'rgba(255, 0, 255, 0.4)', // Dim Magenta
+            'rgba(0, 255, 255, 0.4)', // Dim Cyan
+            'rgba(255, 255, 0, 0.4)', // Dim Yellow
+            'rgba(100, 100, 255, 0.4)', // Dim Blue
+            'rgba(255, 255, 255, 0.3)'  // Dim White
+        ];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+
+        this.twinkle = Math.random() > 0.7; // 30% chance to twinkle
+        this.twinkleSpeed = Math.random() * 0.05 + 0.01;
+        this.alpha = Math.random() * 0.5 + 0.3;
+        this.alphaDir = 1;
+    }
+
+    update() {
+        this.y += this.speed * timeScale;
+        if (this.y > CANVAS_HEIGHT) {
+            this.reset();
+        }
+
+        if (this.twinkle) {
+            this.alpha += this.twinkleSpeed * this.alphaDir;
+            if (this.alpha >= 0.8 || this.alpha <= 0.2) {
+                this.alphaDir *= -1;
+            }
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+
+        // Simple circle or glow
+        if (this.size > 1.5) {
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = this.color;
+        }
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 }
 
@@ -611,6 +674,10 @@ const introOverlay = document.getElementById('intro-overlay');
 const finalScoreElement = document.getElementById('final-score');
 const restartBtn = document.getElementById('restart-btn');
 const startBtn = document.getElementById('start-btn');
+const highScoreListElement = document.getElementById('high-score-list');
+const nameInputContainer = document.getElementById('name-input-container');
+const playerNameInput = document.getElementById('player-name-input');
+const submitScoreBtn = document.getElementById('submit-score-btn');
 
 // Game State
 let timeScale = 1.0;
@@ -618,6 +685,18 @@ let isGameOver = false;
 let score = 0;
 let lives = 3;
 let currentLevel = 1;
+let highScores = JSON.parse(localStorage.getItem('neonInvadersHighScores')) || [
+    { name: 'STARLORD', score: 50000 },
+    { name: 'RIPLEY', score: 40000 },
+    { name: 'SKYWALKER', score: 30000 },
+    { name: 'PICARD', score: 20000 },
+    { name: 'KIRK', score: 15000 },
+    { name: 'SOLO', score: 10000 },
+    { name: 'TRON', score: 8000 },
+    { name: 'NEO', score: 6000 },
+    { name: 'FLYNN', score: 4000 },
+    { name: 'QUORRA', score: 2000 }
+];
 let levelText = "";
 let levelTextTimer = 0;
 let colorCycleIdx = 0;
@@ -634,12 +713,20 @@ let bullets = [];
 let bombs = [];
 let enemies = [];
 let particles = [];
+let stars = [];
 let saucer = null;
 let saucerTimer = (15 + Math.random() * 15) * 60; // 15-30 seconds at 60fps
 
 function createExplosion(x, y, color, count = 10) {
     for (let i = 0; i < count; i++) {
         particles.push(new Particle(x, y, color));
+    }
+}
+
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 100; i++) {
+        stars.push(new Star());
     }
 }
 
@@ -700,6 +787,8 @@ function showIntro() {
     introOverlay.classList.remove('hidden');
     gameOverOverlay.classList.remove('visible');
     gameOverOverlay.classList.add('hidden');
+
+    renderHighScores();
 
     // Clear game state visuals behind menu
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -766,9 +855,63 @@ function triggerGameOver() {
     AudioEngine.playGameOver();
     MusicEngine.stop();
     finalScoreElement.textContent = score.toString().padStart(4, '0');
+
+    // Check for high score
+    const qualifies = highScores.length < 10 || score > highScores[highScores.length - 1].score;
+
+    if (qualifies) {
+        nameInputContainer.classList.remove('hidden');
+        restartBtn.classList.add('hidden');
+        playerNameInput.value = '';
+        playerNameInput.focus();
+    } else {
+        nameInputContainer.classList.add('hidden');
+        restartBtn.classList.remove('hidden');
+    }
+
     gameOverOverlay.classList.remove('hidden');
     gameOverOverlay.classList.add('visible');
 }
+
+function renderHighScores() {
+    highScoreListElement.innerHTML = '';
+    highScores.forEach((entry, index) => {
+        const li = document.createElement('li');
+        li.className = 'high-score-entry';
+        // Cycling color class logic is in CSS on parent or we can add specific classes
+        // The prompt asked for "rapidly color cycling font". The title has it.
+        // Let's add it to the score text or rows.
+        // Currently .high-score-title has the animation.
+        // Let's make the list items also cycle or just be static?
+        // Prompt: "displays the top 10 high scores ... in large, rapidly color cycling font".
+        // It implies the list itself.
+        // Apply logic to elements.
+
+        li.innerHTML = `<span class="high-score-rank">${index + 1}. ${entry.name}</span> <span class="high-score-val">${entry.score.toString().padStart(4, '0')}</span>`;
+        // Add animation delay for wave effect?
+        li.style.animation = `colorCycle 2s infinite ${index * 0.1}s`;
+        // We need to define keyframes in CSS for 'li' or inherit. 
+        // I added .high-score-title animation.
+        // Let's reuse that or assume styles.css handles it.
+        // I'll add inline style for now to ensure it works as requested.
+        highScoreListElement.appendChild(li);
+    });
+}
+
+function submitHighScore() {
+    const name = playerNameInput.value.trim().toUpperCase() || 'ANONYMOUS';
+
+    const newEntry = { name: name, score: score };
+    highScores.push(newEntry);
+    highScores.sort((a, b) => b.score - a.score);
+    if (highScores.length > 10) highScores.length = 10;
+
+    localStorage.setItem('neonInvadersHighScores', JSON.stringify(highScores));
+
+    showIntro();
+}
+
+submitScoreBtn.addEventListener('click', submitHighScore);
 
 function checkCollisions() {
     // Player bullets vs Objects
@@ -931,6 +1074,12 @@ function gameLoop() {
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+    // Update & draw Stars (Background)
+    stars.forEach(star => {
+        star.update();
+        star.draw();
+    });
+
     if (!isGameOver) {
         player.update();
         updateEnemies();
@@ -999,5 +1148,6 @@ function gameLoop() {
 }
 
 // Start with intro
+initStars();
 showIntro();
 requestAnimationFrame(gameLoop);

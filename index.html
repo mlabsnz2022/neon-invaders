@@ -27,10 +27,12 @@
         <canvas id="gameCanvas"></canvas>
 
         <div id="intro-overlay">
-            <div class="overlay-content">
-                <h2 class="neon-text-blue">SYSTEM READY</h2>
-                <p>DEFEND THE NEON GRID</p>
-                <button id="start-btn">INITIATE SEQUENCE</button>
+            <div id="high-score-container">
+                <h2 class="high-score-title">High Scores</h2>
+                <ul id="high-score-list" class="high-score-list">
+                    <!-- Populated by JS -->
+                </ul>
+                <button id="start-btn" class="press-start-btn">PRESS SPACE TO PLAY</button>
             </div>
         </div>
 
@@ -38,6 +40,14 @@
             <div class="overlay-content">
                 <h2 class="neon-text-pink">GAME OVER</h2>
                 <p>FINAL SCORE: <span id="final-score">0000</span></p>
+
+                <div id="name-input-container" class="hidden">
+                    <p>NEW HIGH SCORE!</p>
+                    <input type="text" id="player-name-input" maxlength="15" placeholder="ENTER NAME">
+                    <br>
+                    <button id="submit-score-btn">SUBMIT</button>
+                </div>
+
                 <button id="restart-btn">NEURAL REBOOT</button>
             </div>
         </div>
