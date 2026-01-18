@@ -264,7 +264,6 @@ class Player {
     constructor() {
         this.width = 40;
         this.height = 30;
-        this.particles = [];
         this.reset();
     }
 
@@ -275,7 +274,6 @@ class Player {
         this.canShoot = true;
         this.shootDelay = 300;
         this.isExploding = false;
-        this.particles = [];
         timeScale = 1.0;
     }
 
@@ -283,24 +281,10 @@ class Player {
         this.isExploding = true;
         timeScale = 0.1; // Slow down the world
         AudioEngine.playExplosion();
-        // Generate particles
-        for (let i = 0; i < 30; i++) {
-            this.particles.push(new Particle(
-                this.x + this.width / 2,
-                this.y + this.height / 2,
-                this.color
-            ));
-        }
+        createExplosion(this.x + this.width / 2, this.y + this.height / 2, this.color, 40);
     }
 
     draw() {
-        // Draw explosion particles if any
-        this.particles.forEach((p, index) => {
-            p.update();
-            p.draw();
-            if (p.life <= 0) this.particles.splice(index, 1);
-        });
-
         if (this.isExploding) return;
 
         ctx.save();
@@ -365,6 +349,13 @@ let player = new Player();
 let bullets = [];
 let bombs = [];
 let enemies = [];
+let particles = [];
+
+function createExplosion(x, y, color, count = 10) {
+    for (let i = 0; i < count; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
 
 function spawnEnemies() {
     enemies = [];
@@ -422,6 +413,9 @@ function resetGame() {
     isGameOver = false;
     currentLevel = 1;
     player.reset();
+    bullets = [];
+    bombs = [];
+    particles = [];
     scoreElement.textContent = "0000";
     livesElement.textContent = "3";
     gameOverOverlay.classList.add('hidden');
@@ -445,28 +439,47 @@ function triggerGameOver() {
 }
 
 function checkCollisions() {
-    // Player bullets vs Enemies
+    // Player bullets vs Objects
     for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
+        const blt = bullets[i];
+
+        // vs Enemies
+        let hit = false;
         for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
-            if (b.x > e.x && b.x < e.x + e.width && b.y > e.y && b.y < e.y + e.height) {
+            if (blt.x > e.x && blt.x < e.x + e.width && blt.y > e.y && blt.y < e.y + e.height) {
                 bullets.splice(i, 1);
-
+                hit = true;
                 e.health--;
                 if (e.health <= 0) {
                     AudioEngine.playExplosion();
+                    createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color, 20);
                     enemies.splice(j, 1);
                     updateScore(100);
-
-                    // Increase speed as enemies are destroyed
                     const enemiesDestroyed = 40 - enemies.length;
                     enemyMoveSpeed = levelBaseSpeed * (1 + (enemiesDestroyed / 40) * 3);
                 } else {
-                    // Hit feedback
                     e.flashTimer = 5;
                     e.scale = 1.2;
                 }
+                break;
+            }
+        }
+
+        if (hit) continue;
+
+        // vs Enemy Bombs
+        for (let j = bombs.length - 1; j >= 0; j--) {
+            const bmb = bombs[j];
+            // Treat bombs as a small box for easier hitting
+            if (blt.x > bmb.x - 10 && blt.x < bmb.x + 10 &&
+                blt.y > bmb.y - 10 && blt.y < bmb.y + 10) {
+
+                bullets.splice(i, 1);
+                bombs.splice(j, 1);
+                AudioEngine.playExplosion();
+                createExplosion(bmb.x, bmb.y, bmb.color, 8);
+                updateScore(10);
                 break;
             }
         }
@@ -584,6 +597,13 @@ function gameLoop() {
 
     player.draw();
     enemies.forEach(e => e.draw());
+
+    // Update & draw particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
 
     // UI Overlays (Level/Victory text)
     if (levelTextTimer > 0) {
