@@ -22,7 +22,8 @@ const COLORS = {
     enemy: '#ff00ff',
     bullet: '#ffffff',
     bomb: '#ff3333',
-    ui: '#9d00ff'
+    ui: '#9d00ff',
+    levels: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
 };
 
 // --- AUDIO SYSTEM ---
@@ -170,51 +171,65 @@ class Bullet {
 
 // Bomb class (Enemy)
 class Bomb {
-    constructor(x, y) {
+    constructor(x, y, color) {
         this.x = x;
         this.y = y;
         this.width = 6;
         this.height = 12;
+        this.color = color || COLORS.bomb;
     }
 
     draw() {
         ctx.save();
         ctx.shadowBlur = 10;
-        ctx.shadowColor = COLORS.bomb;
-        ctx.fillStyle = COLORS.bomb;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
         // Zigzag bomb shape
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x + 4, this.y + 4);
         ctx.lineTo(this.x - 4, this.y + 8);
         ctx.lineTo(this.x, this.y + 12);
-        ctx.stroke();
-        ctx.strokeStyle = COLORS.bomb;
+        ctx.strokeStyle = this.color;
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
     }
 
     update() {
-        this.y += BOMB_SPEED * timeScale;
+        this.y += (this.currentSpeed || BOMB_SPEED) * timeScale;
     }
 }
 
 // Enemy class
 class Enemy {
-    constructor(x, y) {
+    constructor(x, y, color, health) {
         this.x = x;
         this.y = y;
         this.width = 40;
         this.height = 30;
-        this.color = COLORS.enemy;
+        this.color = color || COLORS.enemy;
+        this.health = health || 1;
+        this.flashTimer = 0;
+        this.scale = 1.0;
     }
 
     draw() {
         ctx.save();
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = this.color;
-        ctx.strokeStyle = this.color;
+
+        // Apply hit feedback (scale and flash)
+        const currentScale = this.scale;
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.scale(currentScale, currentScale);
+        ctx.translate(-centerX, -centerY);
+
+        const drawColor = this.flashTimer > 0 ? '#ffffff' : this.color;
+
+        ctx.shadowBlur = this.flashTimer > 0 ? 30 : 15;
+        ctx.shadowColor = drawColor;
+        ctx.strokeStyle = drawColor;
         ctx.lineWidth = 2;
 
         ctx.beginPath();
@@ -229,9 +244,14 @@ class Enemy {
         ctx.closePath();
 
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.1)';
+        ctx.fillStyle = drawColor + '22';
         ctx.fill();
         ctx.restore();
+
+        // Decay feedback
+        if (this.flashTimer > 0) this.flashTimer--;
+        if (this.scale > 1.0) this.scale -= 0.05;
+        if (this.scale < 1.0) this.scale = 1.0;
     }
 
     update(dx, dy) {
@@ -304,7 +324,7 @@ class Player {
     }
 
     update() {
-        if (this.isExploding) return;
+        if (this.isExploding || isPausedForLevel) return;
         if (keys.ArrowLeft && this.x > 0) this.x -= PLAYER_SPEED * timeScale;
         if (keys.ArrowRight && this.x < CANVAS_WIDTH - this.width) this.x += PLAYER_SPEED * timeScale;
         if (keys.Space && this.canShoot) this.shoot();
@@ -330,9 +350,16 @@ let timeScale = 1.0;
 let isGameOver = false;
 let score = 0;
 let lives = 3;
+let currentLevel = 1;
+let levelText = "";
+let levelTextTimer = 0;
+let colorCycleIdx = 0;
+let isPausedForLevel = false;
+
 let enemyDirection = 1;
 let enemyMoveTimer = 0;
 let enemyMoveSpeed = 1;
+let levelBaseSpeed = 1;
 
 let player = new Player();
 let bullets = [];
@@ -347,27 +374,59 @@ function spawnEnemies() {
     const offsetX = (CANVAS_WIDTH - (cols * spacing)) / 2;
     const offsetY = 50;
 
+    // Row configuration from top to bottom
+    const rowConfig = [
+        { color: '#ff0000', health: 5 },
+        { color: '#ffff00', health: 4 },
+        { color: '#00ff00', health: 3 },
+        { color: '#0000ff', health: 2 }
+    ];
+
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-            enemies.push(new Enemy(offsetX + c * spacing, offsetY + r * spacing));
+            enemies.push(new Enemy(
+                offsetX + c * spacing,
+                offsetY + r * spacing,
+                rowConfig[r].color,
+                rowConfig[r].health
+            ));
         }
     }
+}
+
+function startLevel(level) {
+    currentLevel = level;
+    isPausedForLevel = true;
+    levelText = `LEVEL ${level}`;
+    levelTextTimer = 180; // 3 seconds at 60fps
+
+    // Scale difficulty
+    // Level 10 is original speed (enemyMoveSpeed = 1, bombSpeed multiplier = 1)
+    // Level 1 starts at 20% speed
+    const difficultyMultiplier = 0.2 + (0.8 * (level - 1) / 9);
+    levelBaseSpeed = 1 * difficultyMultiplier;
+    enemyMoveSpeed = levelBaseSpeed;
+
+    bullets = [];
+    bombs = [];
+    spawnEnemies();
+
+    setTimeout(() => {
+        isPausedForLevel = false;
+    }, 3000);
 }
 
 function resetGame() {
     score = 0;
     lives = 3;
     isGameOver = false;
-    bullets = [];
-    bombs = [];
-    enemyDirection = 1;
-    enemyMoveSpeed = 1;
+    currentLevel = 1;
     player.reset();
-    spawnEnemies();
     scoreElement.textContent = "0000";
     livesElement.textContent = "3";
     gameOverOverlay.classList.add('hidden');
     gameOverOverlay.classList.remove('visible');
+    startLevel(1);
     requestAnimationFrame(gameLoop);
 }
 
@@ -392,11 +451,22 @@ function checkCollisions() {
         for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
             if (b.x > e.x && b.x < e.x + e.width && b.y > e.y && b.y < e.y + e.height) {
-                AudioEngine.playExplosion();
-                enemies.splice(j, 1);
                 bullets.splice(i, 1);
-                updateScore(100);
-                enemyMoveSpeed += 0.05; // Speed up as enemies die
+
+                e.health--;
+                if (e.health <= 0) {
+                    AudioEngine.playExplosion();
+                    enemies.splice(j, 1);
+                    updateScore(100);
+
+                    // Increase speed as enemies are destroyed
+                    const enemiesDestroyed = 40 - enemies.length;
+                    enemyMoveSpeed = levelBaseSpeed * (1 + (enemiesDestroyed / 40) * 3);
+                } else {
+                    // Hit feedback
+                    e.flashTimer = 5;
+                    e.scale = 1.2;
+                }
                 break;
             }
         }
@@ -435,13 +505,25 @@ function checkCollisions() {
     }
 
     // Win check (all enemies dead)
-    if (enemies.length === 0 && !isGameOver) {
-        spawnEnemies();
-        enemyMoveSpeed += 0.5;
+    if (enemies.length === 0 && !isGameOver && !isPausedForLevel) {
+        if (currentLevel < 10) {
+            isPausedForLevel = true;
+            levelText = "LEVEL CLEARED!";
+            levelTextTimer = 120;
+            setTimeout(() => {
+                startLevel(currentLevel + 1);
+            }, 1500);
+        } else {
+            isGameOver = true;
+            levelText = "YOU HAVE OBLITERATED THE ALIENS";
+            levelTextTimer = 999999;
+        }
     }
 }
 
 function updateEnemies() {
+    if (isPausedForLevel) return;
+
     let shouldChangeDirection = false;
     let dy = 0;
 
@@ -461,12 +543,17 @@ function updateEnemies() {
     const currentEnemyDX = enemyDirection * enemyMoveSpeed * timeScale;
     const currentEnemyDY = dy * timeScale;
 
+    const difficultyMultiplier = 0.2 + (0.8 * (currentLevel - 1) / 9);
+    const currentBombSpeed = BOMB_SPEED * difficultyMultiplier * timeScale;
+
     for (let e of enemies) {
         e.update(currentEnemyDX, currentEnemyDY);
 
-        // Random shooting - rate also affected by timeScale
+        // Random shooting - rate and speed affected by level
         if (Math.random() < 0.001 * enemyMoveSpeed * timeScale) {
-            bombs.push(new Bomb(e.x + e.width / 2, e.y + e.height));
+            const b = new Bomb(e.x + e.width / 2, e.y + e.height, e.color);
+            b.currentSpeed = currentBombSpeed;
+            bombs.push(b);
             AudioEngine.playBomb();
         }
     }
@@ -497,6 +584,22 @@ function gameLoop() {
 
     player.draw();
     enemies.forEach(e => e.draw());
+
+    // UI Overlays (Level/Victory text)
+    if (levelTextTimer > 0) {
+        levelTextTimer--;
+        colorCycleIdx++;
+        const color = COLORS.levels[colorCycleIdx % COLORS.levels.length];
+
+        ctx.save();
+        ctx.font = "bold 40px Orbitron";
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = color;
+        ctx.fillText(levelText, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        ctx.restore();
+    }
 
     requestAnimationFrame(gameLoop);
 }
