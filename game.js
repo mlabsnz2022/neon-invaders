@@ -171,6 +171,65 @@ const AudioEngine = {
         this.sirenGain = null;
     },
 
+    playLevelStart() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Rising synth swell
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.2);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    },
+
+    playLevelComplete() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // TADA chord (C Major: C, E, G, C)
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth'; // bright sound
+            osc.frequency.setValueAtTime(freq, now + i * 0.05);
+            gain.gain.setValueAtTime(0.05, now + i * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.8);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.05);
+            osc.stop(now + i * 0.05 + 0.8);
+        });
+    },
+
+    playGameOver() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Sad minor descending arpeggio (A Minor: E4, C4, A3)
+        const notes = [329.63, 261.63, 220.00];
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle'; // Mellow sound
+            osc.frequency.setValueAtTime(freq, now + i * 0.4);
+
+            gain.gain.setValueAtTime(0, now + i * 0.4);
+            gain.gain.linearRampToValueAtTime(0.1, now + i * 0.4 + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.4 + 1.2);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.4);
+            osc.stop(now + i * 0.4 + 1.2);
+        });
+    },
+
     playSaucerVictory() {
         if (!this.ctx) return;
         const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
@@ -544,6 +603,7 @@ function startLevel(level) {
     isPausedForLevel = true;
     levelText = `LEVEL ${level}`;
     levelTextTimer = 180; // 3 seconds at 60fps
+    AudioEngine.playLevelStart();
 
     // Scale difficulty
     // Level 10 is original speed (enemyMoveSpeed = 1, bombSpeed multiplier = 1)
@@ -628,6 +688,7 @@ function triggerGameOver() {
         saucer.active = false;
         saucer = null;
     }
+    AudioEngine.playGameOver();
     finalScoreElement.textContent = score.toString().padStart(4, '0');
     gameOverOverlay.classList.remove('hidden');
     gameOverOverlay.classList.add('visible');
@@ -737,6 +798,7 @@ function checkCollisions() {
             isPausedForLevel = true;
             levelText = "LEVEL CLEARED!";
             levelTextTimer = 120;
+            AudioEngine.playLevelComplete();
             setTimeout(() => {
                 startLevel(currentLevel + 1);
             }, 1500);
