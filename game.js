@@ -657,12 +657,52 @@ class Player {
     shoot(force = false) {
         if (!this.canShoot && !force) return;
 
+        // Rate limit manual fire to prevent macro spam (10Hz cap)
+        if (force) {
+            const now = Date.now();
+            if (this.lastManualShot && now - this.lastManualShot < 100) return;
+            this.lastManualShot = now;
+        }
+
         bullets.push(new Bullet(this.x + this.width / 2, this.y));
         AudioEngine.playShoot();
         this.canShoot = false;
         // clear any existing timeout if we forced a shot, to reset the rhythm
         if (this.shootTimer) clearTimeout(this.shootTimer);
         this.shootTimer = setTimeout(() => this.canShoot = true, this.shootDelay / timeScale);
+    }
+}
+
+// Floating Score Text class
+class FloatingText {
+    constructor(x, y, text) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.life = 60; // 1 second at 60fps
+        this.dy = -1.0; // Float up
+        this.colors = ['#ff0000', '#ff00ff', '#0000ff', '#00ffff', '#00ff00', '#ffff00', '#ff8000'];
+    }
+
+    update() {
+        this.y += this.dy * timeScale;
+        this.life -= 1 * timeScale;
+    }
+
+    draw() {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.font = "bold 20px Orbitron";
+        // Rapid color cycle
+        const colorIndex = Math.floor(Date.now() / 50) % this.colors.length;
+        ctx.fillStyle = this.colors[colorIndex];
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.globalAlpha = Math.min(1.0, this.life / 20); // Fade out at end
+        ctx.textAlign = "center";
+
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
     }
 }
 
@@ -714,6 +754,7 @@ let bombs = [];
 let enemies = [];
 let particles = [];
 let stars = [];
+let floatingTexts = [];
 let saucer = null;
 let saucerTimer = (15 + Math.random() * 15) * 60; // 15-30 seconds at 60fps
 
@@ -821,6 +862,7 @@ function resetGame() {
     bullets = [];
     bombs = [];
     particles = [];
+    floatingTexts = [];
     saucer = null;
     saucerTimer = (15 + Math.random() * 15) * 60;
 
@@ -930,7 +972,9 @@ function checkCollisions() {
                     AudioEngine.playEnemyExplosion();
                     createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color, 20);
                     enemies.splice(j, 1);
-                    updateScore(100);
+                    const killScore = 100;
+                    updateScore(killScore);
+                    floatingTexts.push(new FloatingText(e.x + e.width / 2, e.y, "+" + killScore));
                     const enemiesDestroyed = 40 - enemies.length;
                     enemyMoveSpeed = levelBaseSpeed * (1 + (enemiesDestroyed / 40) * 3);
                 } else {
@@ -969,7 +1013,9 @@ function checkCollisions() {
             AudioEngine.playSaucerVictory();
             AudioEngine.stopSaucerSiren();
             createExplosion(saucer.x + saucer.width / 2, saucer.y + saucer.height / 2, saucer.color, 30);
-            updateScore(500); // High score for the saucer
+            const saucerScore = 500;
+            updateScore(saucerScore); // High score for the saucer
+            floatingTexts.push(new FloatingText(saucer.x + saucer.width / 2, saucer.y, "+" + saucerScore));
             saucer.active = false;
             saucerTimer = (15 + Math.random() * 15) * 60; // Reset spawn timer
         }
@@ -1126,6 +1172,13 @@ function gameLoop() {
         particles[i].update();
         particles[i].draw();
         if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    // Update & draw Floating Texts
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        floatingTexts[i].update();
+        floatingTexts[i].draw();
+        if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
     }
 
     // UI Overlays (Level/Victory text)
