@@ -29,10 +29,24 @@ const COLORS = {
 // --- AUDIO SYSTEM ---
 const AudioEngine = {
     ctx: null,
+    sirenOsc: null,
+    sirenGain: null,
+    noiseBuffer: null,
 
     init() {
         if (!this.ctx) {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.createNoiseBuffer();
+        }
+    },
+
+    createNoiseBuffer() {
+        if (!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 2;
+        this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = this.noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
         }
     },
 
@@ -40,17 +54,13 @@ const AudioEngine = {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-
         osc.type = 'square';
         osc.frequency.setValueAtTime(440, this.ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.1);
-
         gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-
         osc.start();
         osc.stop(this.ctx.currentTime + 0.1);
     },
@@ -59,38 +69,130 @@ const AudioEngine = {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-
         osc.type = 'sine';
         osc.frequency.setValueAtTime(200, this.ctx.currentTime);
         osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 0.2);
-
-        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
-
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-
         osc.start();
         osc.stop(this.ctx.currentTime + 0.2);
     },
 
-    playExplosion() {
+    playHitBlip() {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-
-        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
-
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-
         osc.start();
-        osc.stop(this.ctx.currentTime + 0.5);
+        osc.stop(this.ctx.currentTime + 0.05);
+    },
+
+    playEnemyExplosion() {
+        if (!this.ctx || !this.noiseBuffer) return;
+        const source = this.ctx.createBufferSource();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        source.buffer = this.noiseBuffer;
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.3);
+
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        source.start();
+        source.stop(this.ctx.currentTime + 0.3);
+    },
+
+    playPlayerExplosion() {
+        if (!this.ctx || !this.noiseBuffer) return;
+        const source = this.ctx.createBufferSource();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        source.buffer = this.noiseBuffer;
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(2000, this.ctx.currentTime);
+        filter.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 1.0);
+
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.0);
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        source.start();
+        source.stop(this.ctx.currentTime + 1.0);
+    },
+
+    startSaucerSiren() {
+        if (!this.ctx || this.sirenOsc) return;
+        this.sirenOsc = this.ctx.createOscillator();
+        this.sirenGain = this.ctx.createGain();
+
+        this.sirenOsc.type = 'sine';
+        // Frequency sweep siren effect
+        const now = this.ctx.currentTime;
+        this.sirenOsc.frequency.setValueAtTime(440, now);
+
+        // Loop a frequency wobble
+        for (let i = 0; i < 100; i++) {
+            this.sirenOsc.frequency.linearRampToValueAtTime(880, now + i * 0.4 + 0.2);
+            this.sirenOsc.frequency.linearRampToValueAtTime(440, now + i * 0.4 + 0.4);
+        }
+
+        this.sirenGain.gain.setValueAtTime(0, now);
+        this.sirenGain.gain.linearRampToValueAtTime(0.05, now + 0.1);
+
+        this.sirenOsc.connect(this.sirenGain);
+        this.sirenGain.connect(this.ctx.destination);
+        this.sirenOsc.start();
+    },
+
+    stopSaucerSiren() {
+        if (!this.sirenOsc) return;
+        const now = this.ctx.currentTime;
+        this.sirenGain.gain.cancelScheduledValues(now);
+        this.sirenGain.gain.setValueAtTime(this.sirenGain.gain.value, now);
+        this.sirenGain.gain.linearRampToValueAtTime(0, now + 0.1);
+        this.sirenOsc.stop(now + 0.1);
+        this.sirenOsc = null;
+        this.sirenGain = null;
+    },
+
+    playSaucerVictory() {
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        const now = this.ctx.currentTime;
+
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, now + i * 0.1);
+            gain.gain.setValueAtTime(0.05, now + i * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.1);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.1);
+            osc.stop(now + i * 0.1 + 0.1);
+        });
+    },
+
+    playExplosion() {
+        // Legacy fallback
+        this.playEnemyExplosion();
     }
 };
 
@@ -327,7 +429,7 @@ class Player {
     explode() {
         this.isExploding = true;
         timeScale = 0.1; // Slow down the world
-        AudioEngine.playExplosion();
+        AudioEngine.playPlayerExplosion();
         createExplosion(this.x + this.width / 2, this.y + this.height / 2, this.color, 40);
     }
 
@@ -498,13 +600,14 @@ function checkCollisions() {
                 hit = true;
                 e.health--;
                 if (e.health <= 0) {
-                    AudioEngine.playExplosion();
+                    AudioEngine.playEnemyExplosion();
                     createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color, 20);
                     enemies.splice(j, 1);
                     updateScore(100);
                     const enemiesDestroyed = 40 - enemies.length;
                     enemyMoveSpeed = levelBaseSpeed * (1 + (enemiesDestroyed / 40) * 3);
                 } else {
+                    AudioEngine.playHitBlip();
                     e.flashTimer = 5;
                     e.scale = 1.2;
                 }
@@ -523,7 +626,7 @@ function checkCollisions() {
 
                 bullets.splice(i, 1);
                 bombs.splice(j, 1);
-                AudioEngine.playExplosion();
+                AudioEngine.playEnemyExplosion();
                 createExplosion(bmb.x, bmb.y, bmb.color, 8);
                 updateScore(10);
                 break;
@@ -536,7 +639,8 @@ function checkCollisions() {
             blt.y > saucer.y && blt.y < saucer.y + saucer.height) {
 
             bullets.splice(i, 1);
-            AudioEngine.playExplosion();
+            AudioEngine.playSaucerVictory();
+            AudioEngine.stopSaucerSiren();
             createExplosion(saucer.x + saucer.width / 2, saucer.y + saucer.height / 2, saucer.color, 30);
             updateScore(500); // High score for the saucer
             saucer.active = false;
@@ -661,12 +765,16 @@ function gameLoop() {
     if (saucer && saucer.active) {
         saucer.update();
         saucer.draw();
-        if (!saucer.active) saucer = null;
-    } else if (!isPausedForLevel) {
+        if (!saucer.active) {
+            AudioEngine.stopSaucerSiren();
+            saucer = null;
+        }
+    } else if (!isPausedForLevel && !isGameOver) {
         saucerTimer--;
         if (saucerTimer <= 0) {
             const direction = Math.random() > 0.5 ? 1 : -1;
             saucer = new Saucer(direction);
+            AudioEngine.startSaucerSiren();
             saucerTimer = (15 + Math.random() * 15) * 60;
         }
     }
