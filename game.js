@@ -6,7 +6,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Constants
-const CANVAS_WIDTH = 450;
+const CANVAS_WIDTH = 650;
 const CANVAS_HEIGHT = 800;
 const PLAYER_SPEED = 5;
 const BULLET_SPEED = 7;
@@ -267,7 +267,7 @@ class Saucer {
         this.height = 20;
         this.color = '#00ffff';
         this.direction = direction; // 1 for left-to-right, -1 for right-to-left
-        this.speed = 1.0;
+        this.speed = 1.35;
         this.x = direction === 1 ? -this.width : CANVAS_WIDTH;
         this.y = 50; // Positioned above the main enemy grid
         this.active = true;
