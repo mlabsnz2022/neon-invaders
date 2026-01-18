@@ -320,11 +320,25 @@ window.addEventListener('keydown', (e) => {
     if (keys.hasOwnProperty(e.code)) {
         keys[e.code] = true;
     }
+    if (e.code === 'Space' && !e.repeat && !isGameOver && !isPausedForLevel && !isInMenu) {
+        if (player.canManualFire) {
+            player.shoot(true);
+            player.canManualFire = false;
+        }
+    }
 });
 
 window.addEventListener('keyup', (e) => {
     if (keys.hasOwnProperty(e.code)) {
         keys[e.code] = false;
+    }
+    if (e.code === 'Space') {
+        // Debounce manual reset to filter out OS auto-repeat KeyUp/KeyDown pairs (common on Linux)
+        setTimeout(() => {
+            if (!keys.Space) {
+                player.canManualFire = true;
+            }
+        }, 50);
     }
 });
 
@@ -534,6 +548,8 @@ class Player {
         this.color = COLORS.player;
         this.canShoot = true;
         this.shootDelay = 300;
+        this.shootTimer = null;
+        this.canManualFire = true;
         this.isExploding = false;
         timeScale = 1.0;
     }
@@ -575,11 +591,15 @@ class Player {
         if (keys.Space && this.canShoot) this.shoot();
     }
 
-    shoot() {
+    shoot(force = false) {
+        if (!this.canShoot && !force) return;
+
         bullets.push(new Bullet(this.x + this.width / 2, this.y));
         AudioEngine.playShoot();
         this.canShoot = false;
-        setTimeout(() => this.canShoot = true, this.shootDelay / timeScale);
+        // clear any existing timeout if we forced a shot, to reset the rhythm
+        if (this.shootTimer) clearTimeout(this.shootTimer);
+        this.shootTimer = setTimeout(() => this.canShoot = true, this.shootDelay / timeScale);
     }
 }
 
