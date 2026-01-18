@@ -275,6 +275,30 @@ footer {
     }
 }
 
+.vibe-coded {
+    margin-top: 40px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    color: var(--neon-blue);
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px var(--neon-blue);
+    opacity: 0.8;
+}
+
+.mlabs-logo {
+    margin-top: 15px;
+    width: 120px;
+    height: auto;
+    opacity: 1;
+    transition: all 0.3s ease;
+    filter: brightness(1.5) drop-shadow(0 0 8px #4b0082);
+}
+
+.mlabs-logo:hover {
+    filter: brightness(2.0) drop-shadow(0 0 20px #4b0082);
+    transform: scale(1.1);
+}
+
 .overlay-content h2 {
     font-family: 'Orbitron', sans-serif;
     font-size: 2.5rem;
