@@ -80,12 +80,13 @@ const AudioEngine = {
         osc.stop(this.ctx.currentTime + 0.2);
     },
 
-    playHitBlip() {
+    playHitBlip(pitchMultiplier = 1.0) {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+        const baseFreq = 880 * pitchMultiplier;
+        osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
         gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
         osc.connect(gain);
@@ -280,7 +281,7 @@ const MusicEngine = {
 
         this.currentIndex = nextIndex;
         this.currentAudio = new Audio(MUSIC_TRACKS[this.currentIndex]);
-        this.currentAudio.volume = 0.4;
+        this.currentAudio.volume = 0.28; // Reduced by 30% from 0.4
 
         // When track ends, play another random one (excluding the one that just finished)
         this.currentAudio.addEventListener('ended', () => {
@@ -501,8 +502,10 @@ class Enemy {
         this.height = 30;
         this.color = color || COLORS.enemy;
         this.health = health || 1;
+        this.maxHealth = health || 1;
         this.flashTimer = 0;
         this.scale = 1.0;
+        this.brightness = 1.0; // Increases with each hit
     }
 
     draw() {
@@ -517,6 +520,9 @@ class Enemy {
         ctx.translate(-centerX, -centerY);
 
         const drawColor = this.flashTimer > 0 ? '#ffffff' : this.color;
+
+        // Apply brightness filter
+        ctx.filter = `brightness(${this.brightness})`;
 
         ctx.shadowBlur = this.flashTimer > 0 ? 30 : 15;
         ctx.shadowColor = drawColor;
@@ -537,6 +543,19 @@ class Enemy {
         ctx.stroke();
         ctx.fillStyle = drawColor + '22';
         ctx.fill();
+
+        // Draw health number in center
+        if (this.health > 0) {
+            ctx.filter = 'none'; // Reset filter for text
+            ctx.font = 'bold 16px Orbitron';
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 3;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillText(this.health.toString(), centerX, centerY);
+        }
+
         ctx.restore();
 
         // Decay feedback
@@ -824,7 +843,7 @@ function startLevel(level) {
 
 function showIntro() {
     isInMenu = true;
-    introOverlay.style.display = 'block'; // Ensure visible using direct style if needed, or class
+    introOverlay.style.display = 'flex'; // Ensure visible using direct style if needed, or class
     introOverlay.classList.remove('hidden');
     gameOverOverlay.classList.remove('visible');
     gameOverOverlay.classList.add('hidden');
@@ -978,9 +997,16 @@ function checkCollisions() {
                     const enemiesDestroyed = 40 - enemies.length;
                     enemyMoveSpeed = levelBaseSpeed * (1 + (enemiesDestroyed / 40) * 3);
                 } else {
-                    AudioEngine.playHitBlip();
+                    // Calculate pitch based on damage taken
+                    const damageRatio = (e.maxHealth - e.health) / e.maxHealth;
+                    const pitchMultiplier = 1.0 + (damageRatio * 0.5); // Rises up to 1.5x
+                    AudioEngine.playHitBlip(pitchMultiplier);
+
                     e.flashTimer = 5;
                     e.scale = 1.2;
+
+                    // Increase brightness with each hit
+                    e.brightness = Math.min(2.0, 1.0 + (damageRatio * 1.0)); // Up to 2x brightness
                 }
                 break;
             }

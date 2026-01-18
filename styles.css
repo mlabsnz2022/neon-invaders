@@ -132,7 +132,7 @@ footer {
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    padding-bottom: 80px;
+    padding-bottom: 20px;
     border: none;
     box-shadow: none;
     backdrop-filter: blur(2px);
@@ -254,7 +254,7 @@ footer {
 }
 
 .press-start-btn {
-    margin-top: 40px;
+    margin-top: 60px;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -281,13 +281,23 @@ footer {
 }
 
 .vibe-coded {
-    margin-top: 40px;
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    margin: 0;
     font-family: 'Rajdhani', sans-serif;
     font-size: 0.8rem;
     color: var(--neon-blue);
     letter-spacing: 2px;
     text-shadow: 0 0 5px var(--neon-blue);
     opacity: 0.8;
+    pointer-events: auto;
+}
+
+.vibe-coded p {
+    margin: 0;
 }
 
 .mlabs-logo {
