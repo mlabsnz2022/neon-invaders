@@ -475,8 +475,10 @@ class Player {
 const scoreElement = document.getElementById('score-val');
 const livesElement = document.getElementById('lives-val');
 const gameOverOverlay = document.getElementById('game-over-overlay');
+const introOverlay = document.getElementById('intro-overlay');
 const finalScoreElement = document.getElementById('final-score');
 const restartBtn = document.getElementById('restart-btn');
+const startBtn = document.getElementById('start-btn');
 
 // Game State
 let timeScale = 1.0;
@@ -488,6 +490,7 @@ let levelText = "";
 let levelTextTimer = 0;
 let colorCycleIdx = 0;
 let isPausedForLevel = false;
+let isInMenu = true;
 
 let enemyDirection = 1;
 let enemyMoveTimer = 0;
@@ -558,21 +561,60 @@ function startLevel(level) {
     }, 3000);
 }
 
+function showIntro() {
+    isInMenu = true;
+    introOverlay.style.display = 'block'; // Ensure visible using direct style if needed, or class
+    introOverlay.classList.remove('hidden');
+    gameOverOverlay.classList.remove('visible');
+    gameOverOverlay.classList.add('hidden');
+
+    // Clear game state visuals behind menu
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    enemies = [];
+    bullets = [];
+    bombs = [];
+    particles = [];
+    if (saucer) {
+        saucer.active = false;
+        saucer = null;
+    }
+    AudioEngine.stopSaucerSiren();
+}
+
 function resetGame() {
+    isInMenu = false;
     score = 0;
     lives = 3;
     isGameOver = false;
     currentLevel = 1;
+    timeScale = 1.0;
+
+    introOverlay.style.display = 'none'; // Force hide
+    introOverlay.classList.add('hidden');
+    gameOverOverlay.classList.remove('visible');
+    gameOverOverlay.classList.add('hidden');
+
     player.reset();
     bullets = [];
     bombs = [];
+    particles = [];
     saucer = null;
     saucerTimer = (15 + Math.random() * 15) * 60;
+
+    AudioEngine.stopSaucerSiren();
+    AudioEngine.init();
+    if (AudioEngine.ctx && AudioEngine.ctx.state === 'suspended') {
+        AudioEngine.ctx.resume();
+    }
+
+    scoreElement.textContent = "0000";
+    livesElement.textContent = "3";
+
     startLevel(1);
-    requestAnimationFrame(gameLoop);
 }
 
-restartBtn.addEventListener('click', resetGame);
+startBtn.addEventListener('click', resetGame);
+restartBtn.addEventListener('click', showIntro); // Return to main menu
 
 function updateScore(points) {
     score += points;
@@ -744,24 +786,29 @@ function updateEnemies() {
 }
 
 function gameLoop() {
-    if (isGameOver) return;
+    if (isInMenu) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    player.update();
-    updateEnemies();
-    checkCollisions();
+    if (!isGameOver) {
+        player.update();
+        updateEnemies();
+        checkCollisions();
+    }
 
     // Update & draw bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].update();
+        if (!isGameOver) bullets[i].update();
         if (bullets[i].y < -20) bullets.splice(i, 1);
         else bullets[i].draw();
     }
 
     // Update & draw bombs
     for (let i = bombs.length - 1; i >= 0; i--) {
-        bombs[i].update();
+        if (!isGameOver) bombs[i].update();
         if (bombs[i].y > CANVAS_HEIGHT + 20) bombs.splice(i, 1);
         else bombs[i].draw();
     }
@@ -771,7 +818,7 @@ function gameLoop() {
 
     // Update & draw Saucer
     if (saucer && saucer.active) {
-        saucer.update();
+        if (!isGameOver) saucer.update();
         saucer.draw();
         if (!saucer.active) {
             AudioEngine.stopSaucerSiren();
@@ -813,5 +860,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Start game
-resetGame();
+// Start with intro
+showIntro();
+requestAnimationFrame(gameLoop);

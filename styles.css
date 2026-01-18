@@ -117,6 +117,22 @@ footer {
     display: none;
 }
 
+#intro-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    background: rgba(5, 5, 20, 0.95);
+    border: 2px solid var(--neon-blue);
+    box-shadow: 0 0 30px var(--neon-blue);
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+}
+
 #game-over-overlay.visible {
     display: block;
     animation: flicker 0.5s infinite alternate;
@@ -133,7 +149,13 @@ footer {
     text-shadow: 0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink);
 }
 
-#restart-btn {
+.neon-text-blue {
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+}
+
+#restart-btn,
+#start-btn {
     margin-top: 25px;
     background: transparent;
     border: 1px solid var(--neon-blue);
@@ -146,7 +168,8 @@ footer {
     box-shadow: 0 0 5px var(--neon-blue);
 }
 
-#restart-btn:hover {
+#restart-btn:hover,
+#start-btn:hover {
     background: var(--neon-blue);
     color: var(--dark-bg);
     box-shadow: 0 0 20px var(--neon-blue);
