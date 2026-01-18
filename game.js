@@ -508,6 +508,16 @@ class Enemy {
         this.brightness = 1.0; // Increases with each hit
         this.type = type; // 0=squid, 1=crab, 2=octopus, 3=jellyfish
         this.animFrame = 0; // Animation frame (0 or 1)
+
+        // Dive attack properties
+        this.isDiving = false;
+        this.divePhase = 0; // 0=dive down, 1=loop back, 2=return to formation
+        this.diveSpeed = 0;
+        this.diveAngle = 0;
+        this.formationX = x; // Remember formation position
+        this.formationY = y;
+        this.divePathPoints = [];
+        this.divePathIndex = 0;
     }
 
     drawSquid(centerX, centerY, drawColor) {
@@ -621,9 +631,18 @@ class Enemy {
         const currentScale = this.scale;
         const centerX = this.x + this.width / 2;
         const centerY = this.y + this.height / 2;
-        ctx.translate(centerX, centerY);
-        ctx.scale(currentScale, currentScale);
-        ctx.translate(-centerX, -centerY);
+
+        // Apply rotation if diving
+        if (this.isDiving && this.diveAngle !== 0) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate(this.diveAngle + Math.PI / 2); // +90deg to align with movement
+            ctx.scale(currentScale, currentScale);
+            ctx.translate(-centerX, -centerY);
+        } else {
+            ctx.translate(centerX, centerY);
+            ctx.scale(currentScale, currentScale);
+            ctx.translate(-centerX, -centerY);
+        }
 
         const drawColor = this.flashTimer > 0 ? '#ffffff' : this.color;
 
@@ -672,8 +691,131 @@ class Enemy {
     }
 
     update(dx, dy) {
-        this.x += dx;
-        this.y += dy;
+        if (this.isDiving) {
+            this.updateDive();
+        } else {
+            this.x += dx;
+            this.y += dy;
+            // Update formation position when moving normally
+            this.formationX += dx;
+            this.formationY += dy;
+        }
+    }
+
+    startDive(playerX) {
+        this.isDiving = true;
+        this.divePhase = 0;
+        this.diveSpeed = 1.5; // Slower speed
+
+        // Create a diving path all the way to bottom
+        this.divePathPoints = [];
+        const startX = this.x;
+        const startY = this.y;
+        const bottomY = CANVAS_HEIGHT + 50; // Go past bottom
+
+        // Create a sinusoidal diving path toward player
+        const targetX = playerX + (Math.random() - 0.5) * 100;
+        const pathLength = bottomY - startY;
+        const steps = Math.floor(pathLength / 3); // Slower with more points
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            // Smooth curve toward target with sine wave
+            const x = startX + (targetX - startX) * t + Math.sin(t * Math.PI * 4) * 30;
+            const y = startY + pathLength * t;
+            this.divePathPoints.push({ x, y });
+        }
+
+        this.divePathIndex = 0;
+    }
+
+    updateDive() {
+        if (this.divePathIndex >= this.divePathPoints.length) {
+            // Reached bottom - reposition at top
+            this.repositionAtTop();
+            return;
+        }
+
+        // Follow the path
+        const target = this.divePathPoints[this.divePathIndex];
+        const prevX = this.x;
+        const prevY = this.y;
+
+        this.x = target.x;
+        this.y = target.y;
+
+        // Calculate rotation angle based on movement direction
+        const dx = this.x - prevX;
+        const dy = this.y - prevY;
+        this.diveAngle = Math.atan2(dy, dx);
+
+        this.divePathIndex++;
+    }
+
+    repositionAtTop() {
+        // Find all enemies in formation (not diving)
+        const formationEnemies = enemies.filter(e => !e.isDiving && e !== this);
+
+        if (formationEnemies.length === 0) {
+            // No formation, just place at top center
+            this.x = CANVAS_WIDTH / 2;
+            this.y = 100;
+            this.formationX = this.x;
+            this.formationY = this.y;
+            this.isDiving = false;
+            this.diveAngle = 0;
+            return;
+        }
+
+        // Find the top row
+        const minY = Math.min(...formationEnemies.map(e => e.formationY));
+        const topRowEnemies = formationEnemies.filter(e => Math.abs(e.formationY - minY) < 10);
+
+        // Check for gaps in top row (spacing should be ~45 pixels)
+        const spacing = 45;
+        const topRowXPositions = topRowEnemies.map(e => e.formationX).sort((a, b) => a - b);
+
+        let foundGap = false;
+        let gapX = 0;
+
+        // Check for gaps between enemies
+        for (let i = 0; i < topRowXPositions.length - 1; i++) {
+            const gap = topRowXPositions[i + 1] - topRowXPositions[i];
+            if (gap > spacing * 1.5) {
+                // Found a gap
+                gapX = topRowXPositions[i] + spacing;
+                foundGap = true;
+                break;
+            }
+        }
+
+        if (!foundGap) {
+            // No gap in top row, create new row above
+            // Find leftmost and rightmost positions to determine row bounds
+            const allXPositions = formationEnemies.map(e => e.formationX).sort((a, b) => a - b);
+            const leftmost = allXPositions[0];
+            const rightmost = allXPositions[allXPositions.length - 1];
+            const rowWidth = rightmost - leftmost;
+
+            // Place randomly in new row above
+            const newY = minY - spacing;
+            const randomOffset = Math.random() * rowWidth;
+            gapX = leftmost + randomOffset;
+
+            this.x = gapX;
+            this.y = newY;
+            this.formationX = gapX;
+            this.formationY = newY;
+        } else {
+            // Place in gap
+            this.x = gapX;
+            this.y = minY;
+            this.formationX = gapX;
+            this.formationY = minY;
+        }
+
+        this.isDiving = false;
+        this.diveAngle = 0;
     }
 }
 
@@ -1212,14 +1354,58 @@ function checkCollisions() {
         }
     }
 
-    // Enemies vs Player / Bottom
-    for (let e of enemies) {
-        if (!player.isExploding && e.y + e.height >= player.y) {
-            player.explode();
-            AudioEngine.stopSaucerSiren();
-            if (saucer) saucer.active = false;
-            setTimeout(() => triggerGameOver(), 1000);
-            break;
+    // Enemies vs Player / Bottom (including diving enemies)
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+
+        // Check collision with player (both formation and diving enemies)
+        if (!player.isExploding) {
+            const collision = e.x < player.x + player.width &&
+                e.x + e.width > player.x &&
+                e.y < player.y + player.height &&
+                e.y + e.height > player.y;
+
+            if (collision) {
+                // Diving enemy kamikaze - destroy enemy and damage player
+                if (e.isDiving) {
+                    createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color, 30);
+                    AudioEngine.playEnemyExplosion();
+                    enemies.splice(i, 1);
+
+                    // Player loses a life (same as bomb hit)
+                    player.explode();
+                    lives--;
+                    livesElement.textContent = Math.max(0, lives);
+
+                    if (lives <= 0) {
+                        AudioEngine.stopSaucerSiren();
+                        if (saucer) saucer.active = false;
+                        setTimeout(() => triggerGameOver(), 1500);
+                    } else {
+                        // 2 second delay before reset
+                        setTimeout(() => {
+                            player.reset();
+                        }, 2000);
+                    }
+                    break;
+                }
+
+                // Formation enemies reaching player (instant game over)
+                player.explode();
+                AudioEngine.stopSaucerSiren();
+                if (saucer) saucer.active = false;
+                setTimeout(() => triggerGameOver(), 1000);
+                break;
+            }
+
+            // Formation enemies reaching bottom
+            if (!e.isDiving && e.y + e.height >= player.y) {
+                player.explode();
+                AudioEngine.stopSaucerSiren();
+                if (saucer) saucer.active = false;
+                setTimeout(() => triggerGameOver(), 1000);
+                break;
+            }
         }
     }
 
@@ -1274,6 +1460,32 @@ function updateEnemies() {
             const b = new Bomb(e.x + e.width / 2, e.y + e.height, e.color);
             b.currentSpeed = currentBombSpeed;
             bombs.push(b);
+        }
+    }
+
+    // Dive attack logic
+    const maxDivers = Math.min(currentLevel, 5); // Max 5 divers at once
+    const currentDivers = enemies.filter(e => e.isDiving).length;
+
+    if (currentDivers < maxDivers && Math.random() < 0.002 * currentLevel) {
+        // Find eligible enemies (no enemy below them)
+        const eligibleEnemies = enemies.filter(e => {
+            if (e.isDiving) return false;
+
+            // Check if any enemy is below this one
+            const hasEnemyBelow = enemies.some(other => {
+                return !other.isDiving &&
+                    other !== e &&
+                    Math.abs(other.x - e.x) < 30 && // Same column
+                    other.y > e.y; // Below
+            });
+
+            return !hasEnemyBelow;
+        });
+
+        if (eligibleEnemies.length > 0) {
+            const diver = eligibleEnemies[Math.floor(Math.random() * eligibleEnemies.length)];
+            diver.startDive(player.x + player.width / 2);
         }
     }
 
