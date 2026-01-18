@@ -581,6 +581,11 @@ function updateScore(points) {
 
 function triggerGameOver() {
     isGameOver = true;
+    AudioEngine.stopSaucerSiren();
+    if (saucer) {
+        saucer.active = false;
+        saucer = null;
+    }
     finalScoreElement.textContent = score.toString().padStart(4, '0');
     gameOverOverlay.classList.remove('hidden');
     gameOverOverlay.classList.add('visible');
@@ -661,6 +666,8 @@ function checkCollisions() {
             livesElement.textContent = Math.max(0, lives);
 
             if (lives <= 0) {
+                AudioEngine.stopSaucerSiren();
+                if (saucer) saucer.active = false;
                 setTimeout(() => triggerGameOver(), 1500);
             } else {
                 // 2 second real-time delay before reset
@@ -675,6 +682,8 @@ function checkCollisions() {
     for (let e of enemies) {
         if (!player.isExploding && e.y + e.height >= player.y) {
             player.explode();
+            AudioEngine.stopSaucerSiren();
+            if (saucer) saucer.active = false;
             setTimeout(() => triggerGameOver(), 1000);
             break;
         }
@@ -730,7 +739,6 @@ function updateEnemies() {
             const b = new Bomb(e.x + e.width / 2, e.y + e.height, e.color);
             b.currentSpeed = currentBombSpeed;
             bombs.push(b);
-            AudioEngine.playBomb();
         }
     }
 }
