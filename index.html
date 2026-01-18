@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Invaders | Synthwave Arcade</title>
+    <meta name="description" content="A retro-futuristic Space Invaders clone with a neon synthwave aesthetic.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div id="game-container">
+        <header>
+            <h1>NEON <span class="accent">INVADERS</span></h1>
+            <div id="ui-bar">
+                <div class="stat">SCORE: <span id="score-val">0000</span></div>
+                <div class="stat">LIVES: <span id="lives-val">3</span></div>
+            </div>
+        </header>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="game-over-overlay" class="hidden">
+            <div class="overlay-content">
+                <h2 class="neon-text-pink">GAME OVER</h2>
+                <p>FINAL SCORE: <span id="final-score">0000</span></p>
+                <button id="restart-btn">NEURAL REBOOT</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>ARROWS to Move • SPACE to Fire</p>
+        </footer>
+    </div>
+    <script src="game.js"></script>
+</body>
+
+</html>
