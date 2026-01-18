@@ -6,8 +6,8 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Constants
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 600;
+const CANVAS_WIDTH = 450;
+const CANVAS_HEIGHT = 800;
 const PLAYER_SPEED = 5;
 const BULLET_SPEED = 7;
 const BOMB_SPEED = 4;
@@ -260,6 +260,53 @@ class Enemy {
     }
 }
 
+// Saucer class (Mystery Ship)
+class Saucer {
+    constructor(direction) {
+        this.width = 50;
+        this.height = 20;
+        this.color = '#00ffff';
+        this.direction = direction; // 1 for left-to-right, -1 for right-to-left
+        this.speed = 1.0;
+        this.x = direction === 1 ? -this.width : CANVAS_WIDTH;
+        this.y = 50; // Positioned above the main enemy grid
+        this.active = true;
+    }
+
+    draw() {
+        if (!this.active) return;
+        ctx.save();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = this.color;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+
+        // Saucer body (ellipse)
+        ctx.beginPath();
+        ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Cockpit dome
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 4, Math.PI, 0);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    update() {
+        if (!this.active) return;
+        this.x += this.speed * this.direction * timeScale;
+
+        if ((this.direction === 1 && this.x > CANVAS_WIDTH) ||
+            (this.direction === -1 && this.x < -this.width)) {
+            this.active = false;
+        }
+    }
+}
+
 class Player {
     constructor() {
         this.width = 40;
@@ -350,6 +397,8 @@ let bullets = [];
 let bombs = [];
 let enemies = [];
 let particles = [];
+let saucer = null;
+let saucerTimer = (15 + Math.random() * 15) * 60; // 15-30 seconds at 60fps
 
 function createExplosion(x, y, color, count = 10) {
     for (let i = 0; i < count; i++) {
@@ -360,10 +409,10 @@ function createExplosion(x, y, color, count = 10) {
 function spawnEnemies() {
     enemies = [];
     const rows = 4;
-    const cols = 10;
-    const spacing = 60;
+    const cols = 8;
+    const spacing = 45;
     const offsetX = (CANVAS_WIDTH - (cols * spacing)) / 2;
-    const offsetY = 50;
+    const offsetY = 100; // Moved lower to make room for saucer
 
     // Row configuration from top to bottom
     const rowConfig = [
@@ -415,11 +464,8 @@ function resetGame() {
     player.reset();
     bullets = [];
     bombs = [];
-    particles = [];
-    scoreElement.textContent = "0000";
-    livesElement.textContent = "3";
-    gameOverOverlay.classList.add('hidden');
-    gameOverOverlay.classList.remove('visible');
+    saucer = null;
+    saucerTimer = (15 + Math.random() * 15) * 60;
     startLevel(1);
     requestAnimationFrame(gameLoop);
 }
@@ -482,6 +528,19 @@ function checkCollisions() {
                 updateScore(10);
                 break;
             }
+        }
+
+        // vs Saucer
+        if (saucer && saucer.active &&
+            blt.x > saucer.x && blt.x < saucer.x + saucer.width &&
+            blt.y > saucer.y && blt.y < saucer.y + saucer.height) {
+
+            bullets.splice(i, 1);
+            AudioEngine.playExplosion();
+            createExplosion(saucer.x + saucer.width / 2, saucer.y + saucer.height / 2, saucer.color, 30);
+            updateScore(500); // High score for the saucer
+            saucer.active = false;
+            saucerTimer = (15 + Math.random() * 15) * 60; // Reset spawn timer
         }
     }
 
@@ -597,6 +656,20 @@ function gameLoop() {
 
     player.draw();
     enemies.forEach(e => e.draw());
+
+    // Update & draw Saucer
+    if (saucer && saucer.active) {
+        saucer.update();
+        saucer.draw();
+        if (!saucer.active) saucer = null;
+    } else if (!isPausedForLevel) {
+        saucerTimer--;
+        if (saucerTimer <= 0) {
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            saucer = new Saucer(direction);
+            saucerTimer = (15 + Math.random() * 15) * 60;
+        }
+    }
 
     // Update & draw particles
     for (let i = particles.length - 1; i >= 0; i--) {

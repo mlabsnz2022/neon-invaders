@@ -69,7 +69,7 @@ h1 .accent {
     display: flex;
     justify-content: space-between;
     width: 100%;
-    max-width: 800px;
+    max-width: 450px;
     padding: 10px 20px;
     border: 1px solid var(--neon-purple);
     background: rgba(0, 0, 0, 0.5);
